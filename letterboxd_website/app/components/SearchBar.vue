@@ -1,84 +1,154 @@
 <template>
   <div class="search-wrapper">
     <div class="search-bar">
-      <!-- Search icon inside the input optionally, or just elegant text -->
       <span class="search-icon">🔍</span>
-      <input 
-        v-model="query" 
+      <input
+        v-model="query"
         @input="onInput"
-        placeholder="Search for a country..." 
+        @keydown="onKeydown"
+        placeholder="Search country or movie..."
         type="text"
       />
       <button v-if="query" @click="clearSearch" class="clear-btn">✕</button>
     </div>
-    
-    <!-- Autocomplete Results Dropdown -->
-    <ul v-if="results.length > 0" class="search-results">
-      <li 
-        v-for="country in results" 
-        :key="country.properties.ADMIN"
-        @click="selectCountry(country)"
-      >
-        {{ country.properties.ADMIN }}
-      </li>
+
+    <ul
+      v-if="results.length > 0 || movieResults.length > 0"
+      class="search-results"
+    >
+      <template v-if="results.length > 0">
+        <li class="results-label" v-if="movieResults.length > 0">Countries</li>
+        <li
+          v-for="(country, i) in results"
+          :key="country.properties.ADMIN"
+          :class="{ active: activeIndex === i }"
+          @click="selectCountry(country)"
+          @mouseenter="activeIndex = i"
+        >
+          {{ country.properties.ADMIN }}
+        </li>
+      </template>
+      <template v-if="movieResults.length > 0">
+        <li class="results-label">Films</li>
+        <li
+          v-for="(movie, i) in movieResults"
+          :key="movie.id"
+          :class="{ active: activeIndex === results.length + i }"
+          @click="selectMovie(movie)"
+          @mouseenter="activeIndex = results.length + i"
+          class="movie-result"
+        >
+          <span class="result-title">{{ movie.name }}</span>
+          <span class="result-meta"
+            >{{ movie.date ? Math.trunc(movie.date) : '—'
+            }}{{ movie.director ? ' · ' + movie.director : '' }}</span
+          >
+        </li>
+      </template>
     </ul>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted } from 'vue';
 
-const emit = defineEmits(['country-selected'])
-const query = ref('')
-const results = ref([])
-let allCountries = []
+const emit = defineEmits(['country-selected', 'movie-selected']);
+const query = ref('');
+const results = ref([]);
+const movieResults = ref([]);
+const activeIndex = ref(-1);
+let allCountries = [];
+let searchTimer = null;
 
-// Fetch the geojson to build the auto-complete index
 onMounted(async () => {
   try {
-    const res = await fetch('/datasets/custom.geo.json')
-    const data = await res.json()
-    allCountries = data.features || []
+    const res = await fetch('/datasets/custom.geo.json');
+    const data = await res.json();
+    allCountries = data.features || [];
   } catch (err) {
-    console.error("Failed to load countries for search bar:", err)
+    console.error('Failed to load countries for search bar:', err);
   }
-})
+});
 
-// Filter data as the user types
+const totalResults = () => results.value.length + movieResults.value.length;
+
+const onKeydown = (e) => {
+  const total = totalResults();
+  if (!total) return;
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    activeIndex.value = Math.min(activeIndex.value + 1, total - 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    activeIndex.value = Math.max(activeIndex.value - 1, -1);
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    const idx = activeIndex.value >= 0 ? activeIndex.value : 0;
+    if (idx < results.value.length) selectCountry(results.value[idx]);
+    else selectMovie(movieResults.value[idx - results.value.length]);
+  } else if (e.key === 'Escape') {
+    clearSearch();
+  }
+};
+
 const onInput = () => {
-  if (!query.value.trim()) {
-    results.value = []
-    return
+  activeIndex.value = -1;
+  const q = query.value.trim();
+  if (!q) {
+    results.value = [];
+    movieResults.value = [];
+    return;
   }
-  const lowerQuery = query.value.toLowerCase()
-  
-  // Find countries matching the search string, take top 8
+
   results.value = allCountries
-    .filter(c => c.properties.ADMIN && c.properties.ADMIN.toLowerCase().includes(lowerQuery))
-    .slice(0, 8)
-}
+    .filter(
+      (c) =>
+        c.properties.ADMIN &&
+        c.properties.ADMIN.toLowerCase().includes(q.toLowerCase()),
+    )
+    .slice(0, 5);
 
-// When a user clicks a result
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(async () => {
+    if (q.length < 2) {
+      movieResults.value = [];
+      return;
+    }
+    const res = await $fetch('/api/search', { params: { q } });
+    movieResults.value = res.movies || [];
+  }, 250);
+};
+
 const selectCountry = (country) => {
-  emit('country-selected', country) // Emits the full geojson object back to app.vue
-  clearSearch()
-}
+  emit('country-selected', country);
+  clearSearch();
+};
 
-// Clear the input and dropdown
+const selectMovie = (movie) => {
+  const feature = allCountries.find(
+    (c) =>
+      c.properties.ADMIN?.toLowerCase() === String(movie.country).toLowerCase(),
+  );
+  emit('movie-selected', { movie, country: feature || null });
+  clearSearch();
+};
+
 const clearSearch = () => {
-  query.value = ''
-  results.value = []
-}
+  query.value = '';
+  results.value = [];
+  movieResults.value = [];
+  activeIndex.value = -1;
+};
 </script>
 
 <style scoped>
 .search-wrapper {
   position: absolute;
-  top: 30px;
-  right: 30px;
-  z-index: 100; /* Must sit above the globe canvas */
+  top: 84px; /* below the 60px-ish nav */
+  right: 36px;
+  z-index: 100;
   width: 320px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-sans);
 }
 
 .search-bar {
@@ -90,79 +160,100 @@ const clearSearch = () => {
 .search-icon {
   position: absolute;
   left: 14px;
-  font-size: 16px;
-  opacity: 0.5;
+  font-size: 14px;
+  color: var(--ink-faint);
   pointer-events: none;
 }
 
 .search-bar input {
   width: 100%;
-  padding: 14px 40px 14px 42px; /* Pad left for icon, right for clear button */
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(12px);
-  color: white;
-  font-size: 15px;
+  padding: 12px 40px 12px 40px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  background: var(--bg-elevated);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
   outline: none;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
-  transition: all 0.2s ease;
-}
-
-.search-bar input:focus {
-  border-color: #ffb74d;
-  background: rgba(15, 23, 42, 0.9);
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
 }
 
 .search-bar input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--ink-faint);
+}
+.search-bar input:focus {
+  border-color: var(--accent);
 }
 
 .clear-btn {
   position: absolute;
   right: 14px;
-  background: none;
-  border: none;
-  color: #fff;
-  cursor: pointer;
-  opacity: 0.5;
-  font-size: 14px;
+  color: var(--ink-muted);
+  font-size: 13px;
   padding: 4px;
 }
-
 .clear-btn:hover {
-  opacity: 0.9;
+  color: var(--ink);
 }
 
 .search-results {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   padding: 0;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(16px);
+  background: var(--bg-elevated);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  border: 1px solid var(--rule);
+  box-shadow: 0 12px 28px rgba(20, 17, 13, 0.08);
   max-height: 350px;
   overflow-y: auto;
 }
 
 .search-results li {
-  padding: 14px 18px;
-  color: #e2e8f0;
+  padding: 12px 18px;
+  color: var(--ink);
   cursor: pointer;
-  transition: all 0.2s ease;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  font-size: 15px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 14px;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
 }
-
-.search-results li:hover {
-  background: rgba(255, 183, 77, 0.15);
-  color: #ffb74d;
-  padding-left: 24px; /* Slight indent bump on hover */
+.search-results li:hover,
+.search-results li.active {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
-
 .search-results li:last-child {
   border-bottom: none;
+}
+
+.results-label {
+  padding: 8px 18px 4px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  cursor: default;
+  background: none;
+}
+.results-label:hover {
+  background: none;
+  color: var(--ink-faint);
+}
+
+.movie-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.result-title {
+  font-size: 14px;
+  color: var(--ink);
+}
+.result-meta {
+  font-size: 11px;
+  color: var(--ink-faint);
 }
 </style>

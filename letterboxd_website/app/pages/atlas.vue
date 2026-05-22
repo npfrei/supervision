@@ -1,8 +1,9 @@
 <template>
   <div class="atlas-page">
-    <WorldGlobe :selectedCountry="selectedCountry" @country-clicked="onCountryClicked" />
+    <WorldGlobe :selectedCountry="selectedCountry" :showArcs="showArcs" @country-clicked="onCountryClicked" @arc-clicked="onArcClicked" />
     <SearchBar @country-selected="onCountryClicked" @movie-selected="onMovieSelected" v-show="!showOverlay" />
     <CountryOverlay :country="selectedCountry" :isVisible="showOverlay" :preselectedMovie="preselectedMovie" @close="closeOverlay" />
+    <CoproductionOverlay :arc="selectedArc" :isVisible="showCoprodOverlay" @close="showCoprodOverlay = false" />
     <div class="page-eyebrow eyebrow">No. 001 · The Atlas</div>
   </div>
 </template>
@@ -10,7 +11,10 @@
 <script setup>
 import { ref } from 'vue'
 
+const showArcs = useArcs()
 const selectedCountry = ref(null)
+const selectedArc = ref(null)
+const showCoprodOverlay = ref(false)
 const showOverlay = ref(false)
 const preselectedMovie = ref(null)
 
@@ -30,6 +34,11 @@ const onMovieSelected = ({ movie, country }) => {
   preselectedMovie.value = movie
   selectedCountry.value = country
   showOverlay.value = true
+}
+
+const onArcClicked = (arc) => {
+  selectedArc.value = arc
+  showCoprodOverlay.value = true
 }
 
 const closeOverlay = () => {

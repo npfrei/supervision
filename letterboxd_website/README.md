@@ -95,3 +95,4 @@ npm run preview
 | `npm run db:archive` | Compress `data/local.db` → `dist/letterboxd.db.gz` for upload |
 | `npm run db:publish` | Archive + upload the snapshot to the `latest` GitHub Release (needs `gh`) |
 | `npm run db:extend` | Add actors, crew, and posters tables to an existing `data/local.db` |
+| `npm run db:coproductions` | Build the `coproductions` table from the existing `countries` data (no CSVs needed) |

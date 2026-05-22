@@ -16,10 +16,8 @@ import Globe from 'globe.gl' // This is the default import
 const ROTATION_SPEED = 0.0; // Set to control globe rotation speed. Lower is slower.
 
 const props = defineProps({
-  selectedCountry: {
-    type: Object,
-    default: null
-  }
+  selectedCountry: { type: Object, default: null },
+  showArcs: { type: Boolean, default: false },
 })
 
 const { theme } = useTheme()
@@ -29,11 +27,13 @@ function readVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-const emit = defineEmits(['country-clicked'])
+const emit = defineEmits(['country-clicked', 'arc-clicked'])
 const globeEl = ref(null)
 const errorMsg = ref('')
 let globeInst = null
 let currentHoverD = null
+let arcs = []
+let hoveredArc = null
 
 const getPolygonColor = (d) => {
   const isSelected = props.selectedCountry?.properties?.ADMIN === d.properties.ADMIN
@@ -84,7 +84,8 @@ onMounted(async () => {
         }
       })
       .onPolygonClick(d => {
-        if (props.selectedCountry) return // Disable new clicks while zoned in
+        if (props.selectedCountry) return
+        if (hoveredArc) return
         emit('country-clicked', d)
       });
 
@@ -115,10 +116,50 @@ onMounted(async () => {
     watch(theme, () => {
       if (globeInst) applyMaterial()
     })
+
+    const centroid = {}
+    for (const f of countries.features) {
+      const admin = f.properties?.ADMIN
+      if (!admin) continue
+      const rings = f.geometry.type === 'Polygon'
+        ? [f.geometry.coordinates[0]]
+        : f.geometry.coordinates.map(p => p[0])
+      const ring = rings.reduce((a, b) => a.length >= b.length ? a : b)
+      const lngs = ring.map(c => c[0])
+      const span = Math.max(...lngs) - Math.min(...lngs)
+      const adjLngs = span > 180 ? lngs.map(l => l < 0 ? l + 360 : l) : lngs
+      let lng = adjLngs.reduce((s, l) => s + l, 0) / adjLngs.length
+      if (lng > 180) lng -= 360
+      centroid[admin] = { lat: ring.reduce((s, c) => s + c[1], 0) / ring.length, lng }
+    }
+    const coprod = await fetch('/api/coproductions').then(r => r.json())
+    const sqrtMax = Math.sqrt(Number(coprod[0]?.film_count ?? 1))
+    const sqrtMin = Math.sqrt(Number(coprod[coprod.length - 1]?.film_count ?? 1))
+    arcs = coprod
+      .filter(d => centroid[d.admin_a] && centroid[d.admin_b])
+      .map(d => ({
+        admin_a: d.admin_a, admin_b: d.admin_b,
+        startLat: centroid[d.admin_a].lat, startLng: centroid[d.admin_a].lng,
+        endLat: centroid[d.admin_b].lat, endLng: centroid[d.admin_b].lng,
+        stroke: 0.25 + ((Math.sqrt(Number(d.film_count)) - sqrtMin) / (sqrtMax - sqrtMin)) * 4.75,
+      }))
+    globeInst
+      .arcsData([])
+      .arcStartLat(d => d.startLat).arcStartLng(d => d.startLng)
+      .arcEndLat(d => d.endLat).arcEndLng(d => d.endLng)
+      .arcStroke(d => d.stroke)
+      .arcColor(d => d === hoveredArc ? 'rgba(220,60,60,0.9)' : 'rgba(230,180,80,0.6)')
+      .arcAltitudeAutoScale(0.3)
+      .onArcHover(arc => { hoveredArc = arc; globeInst.arcColor(d => d === hoveredArc ? 'rgba(220,60,60,0.9)' : 'rgba(230,180,80,0.6)'); globeInst.renderer().domElement.style.cursor = arc ? 'pointer' : 'grab' })
+      .onArcClick(arc => emit('arc-clicked', arc))
   } catch (err) {
     console.error("Error loading Globe data:", err)
     errorMsg.value = err.toString() + '\n' + (err.stack || '')
   }
+})
+
+watch(() => props.showArcs, (val) => {
+  if (globeInst) globeInst.arcsData(val ? arcs : [])
 })
 
 watch(() => props.selectedCountry, (newVal) => {

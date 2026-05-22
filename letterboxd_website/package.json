@@ -11,7 +11,8 @@
     "db:fetch": "node scripts/fetch-data.mjs",
     "db:setup": "node scripts/setup-db.mjs",
     "db:archive": "node scripts/build-archive.mjs",
-    "db:extend": "node scripts/extend-db.mjs"
+    "db:extend": "node scripts/extend-db.mjs",
+    "db:coproductions": "node scripts/build-coproductions.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",

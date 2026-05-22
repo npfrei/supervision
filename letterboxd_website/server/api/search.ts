@@ -1,5 +1,7 @@
 export default defineEventHandler(async (event) => {
-  const q = ((getQuery(event).q as string) || '').trim();
+  const query = getQuery(event);
+  const q = ((query.q as string) || '').trim();
+  const country = ((query.country as string) || '').trim();
   if (q.length < 2) return { movies: [] };
 
   const db = useDb();
@@ -9,10 +11,11 @@ export default defineEventHandler(async (event) => {
           (SELECT name FROM crew WHERE id = t.id AND role = 'Director' LIMIT 1) as director
           FROM top_movies_by_country t
           WHERE t.name LIKE ? COLLATE NOCASE
+          ${country ? 'AND t.admin = ? COLLATE NOCASE' : ''}
           GROUP BY t.id
           ORDER BY t.rating DESC
-          LIMIT 6`,
-    args: [`%${q}%`],
+          LIMIT ${country ? 50 : 6}`,
+    args: country ? [`%${q}%`, country] : [`%${q}%`],
   });
   return { movies: res.rows };
 });

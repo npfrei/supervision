@@ -531,11 +531,21 @@ const sortedMovies = computed(() =>
 // ── Filter ────────────────────────────────────────────────────────────────────
 const filterQuery     = ref('')
 const filterHighlight = ref(0)
+const searchResults = ref([])
+let searchTimer = null
+
+watch(filterQuery, (q) => {
+  clearTimeout(searchTimer)
+  if (!q.trim()) { searchResults.value = []; return }
+  searchTimer = setTimeout(async () => {
+    const res = await $fetch('/api/search', { params: { q: q.trim(), country: countryName.value } })
+    searchResults.value = res.movies ?? []
+  }, 200)
+})
 
 const filteredMovies = computed(() => {
-  const q = filterQuery.value.trim().toLowerCase()
-  if (!q) return sortedMovies.value
-  return sortedMovies.value.filter(m => m.name?.toLowerCase().includes(q))
+  if (filterQuery.value.trim()) return searchResults.value
+  return sortedMovies.value
 })
 
 const onFilterKey = (e) => {

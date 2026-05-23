@@ -229,18 +229,19 @@ const clearSearch = () => {
   border-bottom: none;
 }
 
-.results-label {
+.search-results li.results-label {
   padding: 8px 18px 4px;
   font-size: 10px;
+  font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-faint);
+  color: var(--accent);
   cursor: default;
   background: none;
 }
-.results-label:hover {
+.search-results li.results-label:hover {
   background: none;
-  color: var(--ink-faint);
+  color: var(--accent);
 }
 
 .movie-result {

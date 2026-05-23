@@ -42,6 +42,26 @@ const TABLES = [
       ['role', 'text'],
     ],
   },
+  {
+    name: 'genres',
+    csv: resolve(dataDir, 'genres.csv'),
+    ddl: `CREATE TABLE IF NOT EXISTS genres (id INTEGER, genre TEXT)`,
+    insert: 'INSERT INTO genres (id, genre) VALUES (?, ?)',
+    columns: [
+      ['id', 'int'],
+      ['genre', 'text'],
+    ],
+  },
+  {
+    name: 'themes',
+    csv: resolve(dataDir, 'themes.csv'),
+    ddl: `CREATE TABLE IF NOT EXISTS themes (id INTEGER, theme TEXT)`,
+    insert: 'INSERT INTO themes (id, theme) VALUES (?, ?)',
+    columns: [
+      ['id', 'int'],
+      ['theme', 'text'],
+    ],
+  },
 ];
 
 const POST_DDL = [
@@ -50,6 +70,9 @@ const POST_DDL = [
   `CREATE INDEX IF NOT EXISTS idx_crew_id_role ON crew(id, role)`,
   `CREATE INDEX IF NOT EXISTS idx_actors_name ON actors(name)`,
   `CREATE INDEX IF NOT EXISTS idx_crew_name_role ON crew(name, role)`,
+  `CREATE INDEX IF NOT EXISTS idx_genres_id ON genres(id)`,
+  `CREATE INDEX IF NOT EXISTS idx_genres_genre ON genres(genre)`,
+  `CREATE INDEX IF NOT EXISTS idx_themes_id ON themes(id)`,
 ];
 
 const BATCH_SIZE = 5000;

@@ -150,7 +150,7 @@ onMounted(async () => {
       .arcStroke(d => d.stroke)
       .arcColor(d => d === hoveredArc ? 'rgba(220,60,60,0.9)' : 'rgba(230,180,80,0.6)')
       .arcAltitudeAutoScale(0.3)
-      .onArcHover(arc => { hoveredArc = arc; globeInst.arcColor(d => d === hoveredArc ? 'rgba(220,60,60,0.9)' : 'rgba(230,180,80,0.6)'); globeInst.renderer().domElement.style.cursor = arc ? 'pointer' : 'grab' })
+      .onArcHover(arc => { hoveredArc = arc; globeInst.arcColor(d => d === hoveredArc ? 'rgba(180,80,20,0.95)' : 'rgba(230,180,80,0.6)'); globeInst.renderer().domElement.style.cursor = arc ? 'pointer' : 'grab' })
       .onArcClick(arc => emit('arc-clicked', arc))
   } catch (err) {
     console.error("Error loading Globe data:", err)

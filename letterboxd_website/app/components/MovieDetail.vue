@@ -10,8 +10,8 @@
         <div class="eyebrow">{{ movie.date || '—' }}{{ detail?.minute ? ' · ' + detail.minute + ' min' : '' }}</div>
         <h2 class="editorial-title detail-title">{{ movie.name }}</h2>
         <p v-if="detail?.tagline" class="detail-tagline">{{ detail.tagline }}</p>
-        <div class="detail-rating">{{ movie.rating ?? '—' }} <span class="rating-max">/ 5</span></div>
-        <p class="detail-desc">{{ movie.description }}</p>
+        <div v-if="movie.rating ?? detail?.rating" class="detail-rating">{{ movie.rating ?? detail?.rating }} <span class="rating-max">/ 5</span></div>
+        <p class="detail-desc">{{ movie.description || detail?.description }}</p>
 
         <div class="detail-meta">
           <div class="meta-row">

@@ -1,7 +1,10 @@
 <template>
   <div class="constellations-page">
     <button class="back-btn" @click="router.back()">← Back</button>
-    <ActorPicker class="page-picker" @pick="onPick" />
+    <div class="top-right">
+      <span class="eyebrow">No. 003 · Constellation</span>
+      <ActorPicker @pick="onPick" />
+    </div>
     <ActorGraph :slug="slug" :personName="personName" />
   </div>
 </template>
@@ -14,8 +17,8 @@ const router = useRouter()
 const slug = computed(() => String(route.params.slug || '') || 'margot-robbie')
 const personName = computed(() => String(route.query.name || ''))
 
-function onPick(nextSlug: string) {
-  router.push(`/constellations/${nextSlug}`)
+function onPick(payload: { slug: string; name: string }) {
+  router.push({ path: `/constellations/${payload.slug}`, query: { name: payload.name } })
 }
 </script>
 
@@ -24,7 +27,7 @@ function onPick(nextSlug: string) {
 
 .back-btn {
   position: absolute;
-  top: 68px;
+  top: 90px;
   left: 48px;
   z-index: 5;
   font-size: 11px;
@@ -35,10 +38,13 @@ function onPick(nextSlug: string) {
 }
 .back-btn:hover { color: var(--ink); }
 
-.page-picker {
+.top-right {
   position: absolute;
   top: 82px;
   right: 48px;
   z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 </style>

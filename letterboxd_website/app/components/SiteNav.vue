@@ -8,6 +8,7 @@
       <nav class="links">
         <NuxtLink to="/atlas" active-class="on">The Atlas</NuxtLink>
         <NuxtLink to="/constellations" active-class="on">Constellations</NuxtLink>
+        <NuxtLink to="/palette" active-class="on">Palette</NuxtLink>
         <NuxtLink to="/stories" active-class="on">Stories</NuxtLink>
       </nav>
       <div class="divider" aria-hidden="true"></div>

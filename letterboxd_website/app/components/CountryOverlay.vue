@@ -33,10 +33,73 @@
           <div v-show="activePanel === 'films'" class="panel">
             <MovieDetail v-if="selectedMovie" :movie="selectedMovie" @back="selectedMovie = null" />
             <template v-else>
-              <p v-if="movies.length === 0 && !loading" class="empty">No movies found for this country yet.</p>
-              <p v-if="movies.length === 0 && loading" class="empty">Loading films…</p>
+              <!-- Top genres donut (from master branch) -->
+              <div v-if="genres.length" class="viz-panel">
+                <button class="panel-toggle" @click="genresOpen = !genresOpen">
+                  <span class="eyebrow">Top genres</span>
+                  <span class="panel-chevron">{{ genresOpen ? '↑' : '↓' }}</span>
+                </button>
+                <div v-if="genresOpen" class="panel-content">
+                  <div class="donut-layout">
+                    <svg viewBox="0 0 280 280" class="donut-svg">
+                      <path v-for="s in donutSlices" :key="s.genre"
+                        :d="s.path" :fill="s.color"
+                        :class="['donut-slice', { active: selectedGenre === s.genre }]"
+                        @click="selectGenre(s.genre)"
+                      />
+                    </svg>
+                    <ul class="donut-legend">
+                      <li v-for="s in donutSlices" :key="s.genre"
+                        :class="['donut-legend-item', { active: selectedGenre === s.genre }]"
+                        @click="selectGenre(s.genre)">
+                        <span class="donut-legend-dot" :style="{ background: s.color }"></span>
+                        <span class="donut-legend-name">{{ s.genre }}</span>
+                        <span class="donut-legend-count">{{ s.count }}</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
 
-              <div v-if="movies.length > 0" class="filter-bar">
+              <!-- Genres over time (from master branch) -->
+              <div class="viz-panel">
+                <button class="panel-toggle" @click="toggleTimePanel">
+                  <span class="eyebrow">Genres over time</span>
+                  <span class="panel-chevron">{{ timeOpen ? '↑' : '↓' }}</span>
+                </button>
+                <div v-if="timeOpen" class="panel-content">
+                  <p v-if="timeLoading" class="empty" style="margin:12px 0">Loading…</p>
+                  <template v-else-if="timeYears.length">
+                    <div class="time-chart">
+                      <div v-for="y in timeYears" :key="y.year" class="time-col" :title="String(y.year)">
+                        <div v-for="s in y.segments" :key="s.genre" class="time-seg"
+                          :style="{ flex: s.proportion, background: s.color }"
+                          :title="`${s.genre} · ${y.year}`"
+                          @click="selectYearGenre(y.year, s.genre)"></div>
+                      </div>
+                    </div>
+                    <div class="time-axis">
+                      <template v-for="(y, i) in timeYears" :key="y.year">
+                        <span v-if="y.year % 10 === 0" class="time-tick-decade"
+                          :style="{ left: (i / timeYears.length * 100) + '%' }">{{ y.year }}</span>
+                      </template>
+                    </div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Selected-genre filter banner (from master branch) -->
+              <div ref="genreBannerEl" v-if="selectedGenre" class="genre-filter-banner">
+                <span><strong>{{ selectedGenre }}</strong>{{ selectedYear ? ` · ${selectedYear}` : '' }} films</span>
+                <button class="genre-clear" @click="clearGenreFilter">✕ Clear</button>
+              </div>
+
+              <!-- Empty/loading state -->
+              <p v-if="movies.length === 0 && !selectedGenre && !loading" class="empty">No movies found for this country yet.</p>
+              <p v-if="movies.length === 0 && !selectedGenre && loading" class="empty">Loading films…</p>
+
+              <!-- Filter input -->
+              <div v-if="movies.length > 0 || selectedGenre" class="filter-bar">
                 <input
                   v-model="filterQuery"
                   @input="filterHighlight = 0"
@@ -47,6 +110,7 @@
                 />
               </div>
 
+              <!-- Movie list (uses filteredMovies which already handles genre/search/sort) -->
               <ol class="movie-list">
                 <li v-for="(movie, i) in filteredMovies" :key="movie.id"
                   class="movie-row" :class="{ highlighted: i === filterHighlight }"
@@ -61,12 +125,13 @@
                 </li>
               </ol>
 
+              <!-- Show more (genre-aware from master) -->
               <button
-                v-if="hasMore && movies.length > 0 && !filterQuery"
+                v-if="selectedGenre ? genreHasMore : (hasMore && movies.length > 0 && !filterQuery)"
                 class="more-button"
-                :disabled="loading"
-                @click="fetchMovies"
-              >{{ loading ? 'Loading…' : 'Show 25 more' }}</button>
+                :disabled="loading || genreLoading"
+                @click="selectedGenre ? fetchGenreMovies() : fetchMovies()"
+              >{{ (loading || genreLoading) ? 'Loading…' : 'Show 25 more' }}</button>
             </template>
           </div>
 
@@ -84,7 +149,7 @@
                   <div class="kpi-value">{{ fmt1(overall.minute) }}</div>
                   <div class="kpi-label">average film length</div>
                 </div>
-                
+
                 <div class="kpi">
                   <div class="kpi-value">{{ pct(coproductionRate) }}</div>
                   <div class="kpi-label">co-productions</div>
@@ -275,7 +340,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import statsJson from '~/data/stats.json'
 import statsByYearJson from '~/data/stats_by_year.json'
 
@@ -489,7 +554,126 @@ const fetchMovies = async () => {
   }
 }
 
-watch(() => props.isVisible, (newVal) => {
+// ── Genre data (donut + time chart + filtering, from master) ─────────────────
+const genres = ref([])
+
+const PALETTE = ['#C17830','#5B8A6E','#4A6FA5','#8B5E9A','#D4A853','#6B8E50','#A35B7A','#5A7FA0','#7B6B45','#4A8A7A']
+
+function polar(cx, cy, r, deg) {
+  const rad = (deg - 90) * Math.PI / 180
+  return { x: +(cx + r * Math.cos(rad)).toFixed(2), y: +(cy + r * Math.sin(rad)).toFixed(2) }
+}
+function donutPath(cx, cy, R, r, a1, a2) {
+  const large = a2 - a1 > 180 ? 1 : 0
+  const o1 = polar(cx, cy, R, a1), o2 = polar(cx, cy, R, a2)
+  const i1 = polar(cx, cy, r, a2), i2 = polar(cx, cy, r, a1)
+  return `M${o1.x},${o1.y} A${R},${R},0,${large},1,${o2.x},${o2.y} L${i1.x},${i1.y} A${r},${r},0,${large},0,${i2.x},${i2.y} Z`
+}
+
+const genreBannerEl = ref(null)
+const genresOpen = ref(false)
+const timeOpen = ref(false)
+const selectedGenre = ref(null)
+const selectedYear = ref(null)
+const genreMovies = ref([])
+const genreOffset = ref(0)
+const genreHasMore = ref(false)
+const genreLoading = ref(false)
+const timeData = ref([])
+const timeLoading = ref(false)
+
+const donutSlices = computed(() => {
+  const total = genres.value.reduce((s, g) => s + g.count, 0)
+  if (!total) return []
+  let angle = 0
+  return genres.value.map((g, i) => {
+    const sweep = (g.count / total) * 360
+    const gap = sweep > 3 ? 1 : 0
+    const mid = angle + sweep / 2
+    const labelPos = polar(140, 140, 92, mid)
+    const slice = {
+      genre: g.genre, count: g.count, color: PALETTE[i % PALETTE.length], sweep,
+      labelPos, showLabel: sweep > 22,
+      path: donutPath(140, 140, 110, 70, angle + gap / 2, angle + sweep - gap / 2),
+    }
+    angle += sweep
+    return slice
+  })
+})
+
+const genreColorMap = computed(() => {
+  const map = {}
+  genres.value.forEach((g, i) => { map[g.genre] = PALETTE[i % PALETTE.length] })
+  return map
+})
+
+const timeYears = computed(() => {
+  if (!timeData.value.length) return []
+  const byYear = {}
+  for (const r of timeData.value) {
+    if (!byYear[r.year]) byYear[r.year] = {}
+    byYear[r.year][r.genre] = (byYear[r.year][r.genre] || 0) + r.count
+  }
+  return Object.entries(byYear).map(([year, gs]) => {
+    const total = Object.values(gs).reduce((s, c) => s + c, 0)
+    const segments = Object.entries(gs)
+      .sort((a, b) => b[1] - a[1])
+      .map(([genre, count]) => ({ genre, proportion: count / total, color: genreColorMap.value[genre] || '#aaa' }))
+    return { year: Number(year), segments }
+  })
+})
+
+const fetchGenreMovies = async () => {
+  if (!countryName.value || !selectedGenre.value || genreLoading.value) return
+  genreLoading.value = true
+  try {
+    const params = { country: countryName.value, genre: selectedGenre.value, offset: genreOffset.value }
+    if (selectedYear.value) params.year = selectedYear.value
+    const res = await $fetch('/api/country-genre-movies', { params })
+    genreMovies.value.push(...res.rows)
+    genreHasMore.value = res.hasMore
+    genreOffset.value += res.rows.length
+  } finally {
+    genreLoading.value = false
+  }
+}
+
+const scrollToBanner = () => nextTick(() => genreBannerEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+
+const selectGenre = async (genre) => {
+  if (selectedGenre.value === genre && !selectedYear.value) {
+    selectedGenre.value = null; selectedYear.value = null; genreMovies.value = []; genreOffset.value = 0; genreHasMore.value = false
+    return
+  }
+  selectedGenre.value = genre; selectedYear.value = null; genreMovies.value = []; genreOffset.value = 0; genreHasMore.value = false
+  await fetchGenreMovies()
+  scrollToBanner()
+}
+
+const selectYearGenre = async (year, genre) => {
+  selectedGenre.value = genre; selectedYear.value = year; genreMovies.value = []; genreOffset.value = 0; genreHasMore.value = false
+  await fetchGenreMovies()
+  scrollToBanner()
+}
+
+const clearGenreFilter = () => {
+  selectedGenre.value = null; selectedYear.value = null; genreMovies.value = []; genreOffset.value = 0; genreHasMore.value = false
+}
+
+const toggleTimePanel = async () => {
+  timeOpen.value = !timeOpen.value
+  if (timeOpen.value && !timeData.value.length && countryName.value) {
+    timeLoading.value = true
+    try {
+      const res = await $fetch('/api/country-genre-time', { params: { country: countryName.value } })
+      timeData.value = res.rows
+    } finally {
+      timeLoading.value = false
+    }
+  }
+}
+
+watch(() => props.isVisible, async (newVal) => {
   if (newVal) {
     movies.value      = []
     afterRank.value   = 0
@@ -498,7 +682,19 @@ watch(() => props.isVisible, (newVal) => {
     filterHighlight.value = 0
     selectedMovie.value   = props.preselectedMovie || null
     activePanel.value     = 'films'
-    fetchMovies()
+    genres.value          = []
+    genresOpen.value      = false
+    timeOpen.value        = false
+    selectedGenre.value   = null
+    selectedYear.value    = null
+    genreMovies.value     = []
+    genreOffset.value     = 0
+    timeData.value        = []
+    const [, genreRes] = await Promise.all([
+      fetchMovies(),
+      $fetch('/api/country-genres', { params: { country: countryName.value } }),
+    ])
+    genres.value = genreRes.genres
   }
 })
 
@@ -531,11 +727,34 @@ const sortedMovies = computed(() =>
 // ── Filter ────────────────────────────────────────────────────────────────────
 const filterQuery     = ref('')
 const filterHighlight = ref(0)
+const searchResults = ref([])
+let searchTimer = null
+
+watch(filterQuery, (q) => {
+  clearTimeout(searchTimer)
+  if (!q.trim()) { searchResults.value = []; return }
+  searchTimer = setTimeout(async () => {
+    const res = await $fetch('/api/search', { params: { q: q.trim(), country: countryName.value } })
+    searchResults.value = res.movies ?? []
+  }, 200)
+})
+
+const sortedGenreMovies = computed(() => {
+  return [...genreMovies.value].sort((a, b) => {
+    const av = a[sortField.value] ?? 0
+    const bv = b[sortField.value] ?? 0
+    return sortDir.value === 'desc' ? bv - av : av - bv
+  })
+})
 
 const filteredMovies = computed(() => {
-  const q = filterQuery.value.trim().toLowerCase()
-  if (!q) return sortedMovies.value
-  return sortedMovies.value.filter(m => m.name?.toLowerCase().includes(q))
+  if (selectedGenre.value) {
+    const q = filterQuery.value.trim().toLowerCase()
+    if (!q) return sortedGenreMovies.value
+    return sortedGenreMovies.value.filter(m => m.name?.toLowerCase().includes(q))
+  }
+  if (filterQuery.value.trim()) return searchResults.value
+  return sortedMovies.value
 })
 
 const onFilterKey = (e) => {
@@ -562,12 +781,12 @@ const onFilterKey = (e) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 80px 24px 24px;
+  padding: 40px 24px 24px;
 }
 
 .overlay-modal {
-  width: min(960px, 92vw);
-  max-height: calc(100vh - 120px);
+  width: min(1200px, 96vw);
+  max-height: calc(100vh - 80px);
   background: var(--bg-elevated);
   border: 1px solid var(--rule);
   border-radius: 14px;
@@ -677,7 +896,7 @@ const onFilterKey = (e) => {
   padding: 24px 40px 32px;
 }
 
-/* ── Films panel (unchanged styles) ── */
+/* ── Films panel ── */
 .empty {
   font-family: var(--font-serif);
   font-style: italic;
@@ -748,6 +967,44 @@ const onFilterKey = (e) => {
   border-bottom: 1px solid var(--accent);
 }
 .more-button:disabled { color: var(--ink-faint); border-color: var(--ink-faint); cursor: wait; }
+
+/* ── Genre viz panels (from master) ── */
+.viz-panel { border-top: 1px solid var(--rule); margin-bottom: 8px; }
+.panel-toggle {
+  width: 100%; display: flex; justify-content: space-between; align-items: center;
+  padding: 12px 0; cursor: pointer; background: none; border: none;
+}
+.panel-toggle:hover .eyebrow { color: var(--accent); }
+.panel-chevron { font-size: 11px; color: var(--ink-faint); }
+.panel-content { padding-bottom: 20px; }
+
+.donut-layout { display: flex; align-items: center; gap: 24px; }
+.donut-svg { width: 200px; height: 200px; flex-shrink: 0; }
+.donut-slice { cursor: pointer; transition: opacity 120ms ease; }
+.donut-slice:hover { opacity: 0.85; }
+.donut-slice.active { opacity: 1; filter: brightness(1.15); }
+.donut-legend { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
+.donut-legend-item { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; color: var(--ink-muted); }
+.donut-legend-item:hover, .donut-legend-item.active { color: var(--ink); }
+.donut-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.donut-legend-name { flex: 1; }
+.donut-legend-count { font-size: 11px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+
+.time-chart { display: flex; gap: 1px; height: 90px; align-items: stretch; }
+.time-col { flex: 1; display: flex; flex-direction: column; min-width: 0; cursor: default; }
+.time-seg { min-height: 0; cursor: pointer; }
+.time-seg:hover { filter: brightness(1.2); }
+.time-axis { position: relative; height: 16px; margin-top: 3px; }
+.time-tick-decade { position: absolute; font-size: 9px; color: var(--ink-faint); white-space: nowrap; transform: translateX(-50%); }
+
+.genre-filter-banner {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 8px 12px; margin: 12px 0 0;
+  background: var(--accent-soft); border-radius: 6px;
+  font-size: 13px; color: var(--ink);
+}
+.genre-clear { font-size: 12px; color: var(--ink-muted); }
+.genre-clear:hover { color: var(--accent); }
 
 /* ── Stats panel ── */
 .stats-panel { display: flex; flex-direction: column; gap: 28px; }

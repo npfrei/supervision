@@ -7,41 +7,96 @@
       placeholder="Search an actor…"
       @focus="open = true"
       @blur="closeSoon"
+      @keydown="onKeydown"
     />
     <ul v-if="open && results.length" class="picker-results">
       <li
-        v-for="actor in results"
-        :key="actor.slug"
+        v-for="(person, i) in results"
+        :key="person.name"
         class="picker-row"
-        @mousedown.prevent="select(actor)"
+        :class="{ active: activeIndex === i }"
+        @mousedown.prevent="select(person)"
+        @mouseenter="activeIndex = i"
       >
-        {{ actor.name }}
+        {{ person.name }}
       </li>
     </ul>
-    <p v-if="open && query && !results.length" class="picker-empty">
-      No constellation for that name (yet).
+    <p v-if="open && query.trim().length >= 2 && !results.length" class="picker-empty">
+      No results found.
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, watch } from 'vue'
 import index from '../data/actorGraphs.index.json'
 
-const emit = defineEmits<{ (e: 'pick', slug: string): void }>()
+const emit = defineEmits<{ (e: 'pick', payload: { slug: string; name: string }): void }>()
 const query = ref('')
 const open = ref(false)
+const activeIndex = ref(-1)
+const results = ref<{ name: string }[]>([])
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+let requestSeq = 0
+let abortCtl: AbortController | null = null
 
-const results = computed(() => {
-  const q = query.value.trim().toLowerCase()
-  if (!q) return index.actors.slice(0, 8)
-  return index.actors.filter(a => a.name.toLowerCase().includes(q)).slice(0, 8)
+const slugify = (n: string) => n.toLowerCase().normalize('NFD')
+  .replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+
+watch(query, (q) => {
+  if (searchTimer) clearTimeout(searchTimer)
+  // Cancel any in-flight fetch so its (stale) response cannot overwrite a
+  // fresher one if it resolves out-of-order.
+  abortCtl?.abort()
+  activeIndex.value = -1
+  const trimmed = q.trim()
+  if (!trimmed) {
+    results.value = []
+    return
+  }
+  if (trimmed.length < 2) { results.value = []; return }
+  searchTimer = setTimeout(async () => {
+    const seq = ++requestSeq
+    abortCtl = new AbortController()
+    try {
+      const res = await $fetch('/api/search-people', {
+        params: { q: trimmed },
+        signal: abortCtl.signal,
+      })
+      // Drop the response if a newer query has already been issued.
+      if (seq !== requestSeq) return
+      results.value = res.people
+      activeIndex.value = -1
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return
+      // Network/server hiccup: leave results untouched.
+    }
+  }, 80)
 })
 
-function select(actor: { slug: string }) {
+function onKeydown(e: KeyboardEvent) {
+  if (!results.value.length) return
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    activeIndex.value = Math.min(activeIndex.value + 1, results.value.length - 1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    activeIndex.value = Math.max(activeIndex.value - 1, -1)
+  } else if (e.key === 'Enter') {
+    e.preventDefault()
+    const idx = activeIndex.value >= 0 ? activeIndex.value : 0
+    if (results.value[idx]) select(results.value[idx])
+  } else if (e.key === 'Escape') {
+    open.value = false
+    activeIndex.value = -1
+  }
+}
+
+function select(person: { name: string }) {
+  const slug = slugify(person.name)
   query.value = ''
   open.value = false
-  emit('pick', actor.slug)
+  emit('pick', { slug, name: person.name })
 }
 
 function closeSoon() {
@@ -50,7 +105,7 @@ function closeSoon() {
 </script>
 
 <style scoped>
-.picker { position: relative; width: 260px; }
+.picker { position: relative; width: 260px; z-index: 1100; }
 .picker-input {
   width: 100%;
   padding: 10px 16px;
@@ -66,8 +121,13 @@ function closeSoon() {
 .picker-input::placeholder { color: var(--ink-faint); }
 .picker-input:focus { border-color: var(--accent); }
 .picker-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 51;
   list-style: none;
-  margin: 8px 0 0;
+  margin: 0;
   padding: 0;
   background: var(--bg-elevated);
   border-radius: 10px;
@@ -75,6 +135,7 @@ function closeSoon() {
   box-shadow: 0 10px 24px rgba(20, 17, 13, 0.1);
   max-height: 280px;
   overflow-y: auto;
+  text-align: left;
 }
 .picker-row {
   padding: 10px 16px;
@@ -83,13 +144,19 @@ function closeSoon() {
   cursor: pointer;
   border-bottom: 1px solid var(--rule);
 }
-.picker-row:hover {
+.picker-row:hover,
+.picker-row.active {
   background: var(--accent-soft);
   color: var(--accent);
 }
 .picker-row:last-child { border-bottom: none; }
 .picker-empty {
-  margin: 8px 0 0;
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 51;
+  margin: 0;
   padding: 10px 16px;
   font-size: 12px;
   font-style: italic;
@@ -98,5 +165,6 @@ function closeSoon() {
   background: var(--bg-elevated);
   border-radius: 10px;
   border: 1px solid var(--rule);
+  text-align: left;
 }
 </style>

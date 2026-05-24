@@ -45,8 +45,12 @@ export default defineCachedEventHandler(async (event) => {
         return res.rows.map(toFilm)
     }
 
+    // someone who is both actor and director should appear once (as director)
+    const directorNames = new Set(coDirectorsRes.rows.map(r => String(r.name)))
+    const actorOnlyRows = coActorsRes.rows.filter(r => !directorNames.has(String(r.name)))
+
     const [actorFilms, directorFilms] = await Promise.all([
-        Promise.all(coActorsRes.rows.map(r => getSharedFilms(String(r.name), false))),
+        Promise.all(actorOnlyRows.map(r => getSharedFilms(String(r.name), false))),
         Promise.all(coDirectorsRes.rows.map(r => getSharedFilms(String(r.name), true))),
     ])
 
@@ -54,7 +58,7 @@ export default defineCachedEventHandler(async (event) => {
 
     const nodes = [
         { id: centerId, name, role: 'center', sharedFilms: null, films: centerFilmsRes.rows.map(toFilm) },
-        ...coActorsRes.rows.map((r, i) => ({
+        ...actorOnlyRows.map((r, i) => ({
             id: slugify(String(r.name)), name: r.name, role: 'actor',
             sharedFilms: Number(r.count), films: actorFilms[i],
         })),

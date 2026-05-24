@@ -1,13 +1,11 @@
 <template>
   <div class="actor-graph-wrapper">
     <header class="page-header">
-      <div class="eyebrow">No. 003 · Constellation</div>
       <h1 class="editorial-title">
-        {{ targetName }}<em class="emph">, and {{ totalFilmsWord }} films</em>
+        {{ targetName }}&rsquo;s <em class="emph">Constellation</em>
       </h1>
       <p class="lede">
-        {{ collaboratorCount }} names map this constellation — the actors and directors
-        who have shared a frame with them.
+        Explore their most frequent collaborators.
       </p>
     </header>
 
@@ -33,22 +31,27 @@
 
     <Transition name="sidebar">
       <aside v-if="selected" class="sidebar" @click.stop>
-        <button class="sidebar-close" @click="selected = null" aria-label="Close">×</button>
-        <div class="sidebar-role eyebrow">{{ roleLabel(selected.role) }}</div>
-        <h2 class="sidebar-name editorial-title">{{ selected.name }}</h2>
-        <div class="sidebar-subtitle">{{ subtitleFor(selected) }}</div>
-        <ul class="poster-grid">
-          <li v-for="film in selected.films" :key="film.id" class="poster-cell">
-            <div class="poster-frame">
-              <img v-if="film.poster" :src="film.poster" :alt="film.name" class="poster-img" loading="lazy" />
-              <div v-else class="poster-missing">No poster</div>
-            </div>
-            <div class="poster-caption">
-              <span class="poster-year">{{ film.year ?? '—' }}</span>
-              <span class="poster-title">{{ film.name }}</span>
-            </div>
-          </li>
-        </ul>
+        <button class="sidebar-close" @click="selected = null; selectedFilm = null" aria-label="Close">×</button>
+        <template v-if="selectedFilm">
+          <MovieDetail :movie="selectedFilm" @back="selectedFilm = null" />
+        </template>
+        <template v-else>
+          <div class="sidebar-role eyebrow">{{ roleLabel(selected.role) }}</div>
+          <h2 class="sidebar-name editorial-title">{{ selected.name }}</h2>
+          <div class="sidebar-subtitle">{{ subtitleFor(selected) }}</div>
+          <ul class="poster-grid">
+            <li v-for="film in selected.films" :key="film.id" class="poster-cell" @click="selectedFilm = { id: film.id, name: film.name, date: film.year }">
+              <div class="poster-frame">
+                <img v-if="film.poster" :src="film.poster" :alt="film.name" class="poster-img" loading="lazy" />
+                <div v-else class="poster-missing">No poster</div>
+              </div>
+              <div class="poster-caption">
+                <span class="poster-year">{{ film.year ?? '—' }}</span>
+                <span class="poster-title">{{ film.name }}</span>
+              </div>
+            </li>
+          </ul>
+        </template>
       </aside>
     </Transition>
   </div>
@@ -63,6 +66,8 @@ const props = defineProps({
   slug: { type: String, default: 'margot-robbie' },
   personName: { type: String, default: '' },
 })
+
+const emit = defineEmits(['sidebar-state'])
 
 const graphData = ref(null)
 
@@ -83,11 +88,18 @@ async function loadGraph(slug, personName) {
 const svgEl = ref(null)
 const tooltip = reactive({ visible: false, x: 0, y: 0, name: '', roleLabel: '', sharedLabel: '' })
 const selected = ref(null)
+const selectedFilm = ref(null)
 const targetName = computed(() => graphData.value?.meta?.target ?? '')
 
 const totalFilms = computed(() => graphData.value?.meta?.totalFilms ?? 0)
 const collaboratorCount = computed(() =>
   graphData.value?.nodes?.filter(n => n.role !== 'center').length ?? 0
+)
+const actorCount = computed(() =>
+  graphData.value?.nodes?.filter(n => n.role === 'actor').length ?? 0
+)
+const directorCount = computed(() =>
+  graphData.value?.nodes?.filter(n => n.role === 'director').length ?? 0
 )
 
 const numberWord = (n) => {
@@ -137,19 +149,22 @@ const BBOX_PAD_X = 4
 const BBOX_PAD_Y = 2
 
 const LINK_DISTANCE_RATIO = 0.22
-const CHARGE_STRENGTH = -1200
+const CHARGE_STRENGTH = -2000
 const COLLIDE_PAD = 10
-const VIEWPORT_MARGIN = 12
+const VIEWPORT_MARGIN_X = 20
+const VIEWPORT_MARGIN_TOP = 240
+const VIEWPORT_MARGIN_BOTTOM = 60
 const SIDEBAR_WIDTH = 420
+const SIDEBAR_WIDTH_DETAIL = 480
 const FISHEYE_RADIUS = 240
 const FISHEYE_MAX_SCALE = 1.7
 
 const roleLabel = (role) =>
   role === 'center' ? 'Lead' : role === 'director' ? 'Director' : 'Actor'
 
-const fontSize = (node) => {
-  if (node.role === 'center') return 42
-  return 13 + (node.sharedFilms ?? 1) * 4
+const fontSize = (node, maxShared = 1) => {
+  if (node.role === 'center') return 32
+  return Math.round(10 + 18 * ((node.sharedFilms ?? 1) / maxShared))
 }
 
 let simulation = null
@@ -173,7 +188,7 @@ function initialPositions() {
   viewport.height = height
 
   const cx = viewport.effectiveWidth / 2
-  const cy = height / 2
+  const cy = (VIEWPORT_MARGIN_TOP + viewport.height - VIEWPORT_MARGIN_BOTTOM) / 2
   const linkDistance = Math.min(viewport.effectiveWidth, height) * LINK_DISTANCE_RATIO
   const ringRadius = linkDistance
 
@@ -229,12 +244,8 @@ function clipToBoxes(link) {
 
 function clampToViewport(d) {
   if (d.role === 'center') return
-  const minX = d.halfW + VIEWPORT_MARGIN
-  const maxX = viewport.effectiveWidth - d.halfW - VIEWPORT_MARGIN
-  const minY = d.halfH + VIEWPORT_MARGIN
-  const maxY = viewport.height - d.halfH - VIEWPORT_MARGIN
-  d.x = Math.max(minX, Math.min(maxX, d.x))
-  d.y = Math.max(minY, Math.min(maxY, d.y))
+  d.x = Math.max(d.halfW + VIEWPORT_MARGIN_X, Math.min(viewport.effectiveWidth - d.halfW - VIEWPORT_MARGIN_X, d.x))
+  d.y = Math.max(d.halfH + VIEWPORT_MARGIN_TOP, Math.min(viewport.height - d.halfH - VIEWPORT_MARGIN_BOTTOM, d.y))
 }
 
 function applyTransforms() {
@@ -270,10 +281,15 @@ function render() {
 
   const { nodes, cx, cy, linkDistance } = initialPositions()
   graphNodes = nodes
-  const links = graphData.value.links.map((l) => ({
-    source: l.source,
-    target: l.target,
-  }))
+  const maxSharedFilms = Math.max(1, ...nodes.filter(n => n.sharedFilms != null).map(n => n.sharedFilms))
+  const links = graphData.value.links.map((l) => {
+    const targetNode = graphData.value.nodes.find(n => n.id === l.target)
+    return {
+      source: l.source,
+      target: l.target,
+      sharedFilms: targetNode?.sharedFilms ?? 1,
+    }
+  })
 
   const linksG = svg.append('g').attr('class', 'links')
   const nodesG = svg.append('g').attr('class', 'nodes')
@@ -292,10 +308,16 @@ function render() {
     .attr('text-anchor', 'middle')
     .attr('dominant-baseline', 'middle')
     .attr('fill', (d) => nodeColor(d.role))
-    .attr('fill-opacity', (d) => nodeOpacity(d.role))
-    .attr('font-size', (d) => fontSize(d))
+    .attr('fill-opacity', (d) => {
+      if (d.role === 'center' || d.role === 'director') return 1
+      return 0.2 + 0.8 * ((d.sharedFilms ?? 1) / maxSharedFilms)
+    })
+    .attr('font-size', (d) => fontSize(d, maxSharedFilms))
     .attr('font-style', (d) => d.role === 'center' ? 'italic' : 'normal')
-    .attr('font-weight', 500)
+    .attr('font-weight', (d) => {
+      if (d.role === 'center') return 600
+      return Math.round((300 + 600 * ((d.sharedFilms ?? 1) / maxSharedFilms)) / 100) * 100
+    })
     .attr('font-family', (d) => d.role === 'center' ? "Cormorant Garamond, Georgia, serif" : "Inter, system-ui, sans-serif")
     .attr('letter-spacing', '0.01em')
     .attr('paint-order', 'stroke')
@@ -314,8 +336,9 @@ function render() {
     .data(links)
     .enter()
     .append('line')
-    .attr('stroke', edgeStroke())
-    .attr('stroke-width', EDGE_WIDTH)
+    .attr('stroke', readVar('--ink'))
+    .attr('stroke-opacity', (l) => 0.1 + 0.6 * (l.sharedFilms / maxSharedFilms))
+    .attr('stroke-width', (l) => 0.5 + (l.sharedFilms / maxSharedFilms) * 3.5)
     .attr('stroke-linecap', 'round')
 
   if (simulation) simulation.stop()
@@ -365,6 +388,7 @@ function render() {
     .on('click', (event, d) => {
       event.stopPropagation()
       selected.value = d
+      selectedFilm.value = null
       tooltip.visible = false
     })
 
@@ -396,20 +420,24 @@ function shiftForSidebar() {
   const width = svgEl.value.clientWidth
   const height = svgEl.value.clientHeight
   viewport.totalWidth = width
-  viewport.effectiveWidth = selected.value ? Math.max(320, width - SIDEBAR_WIDTH) : width
+  viewport.effectiveWidth = selected.value ? Math.max(320, width - SIDEBAR_WIDTH_DETAIL) : width
   viewport.height = height
 
   const cx = viewport.effectiveWidth / 2
-  const cy = height / 2
+  const cy = (VIEWPORT_MARGIN_TOP + height - VIEWPORT_MARGIN_BOTTOM) / 2
   const center = graphNodes.find((n) => n.role === 'center')
   if (center) { center.fx = cx; center.fy = cy }
   simulation.force('center', d3.forceCenter(cx, cy).strength(0.02))
   simulation.alpha(0.5).restart()
 }
 
-watch(selected, () => {
-  shiftForSidebar()
-})
+watch(selected, () => { shiftForSidebar(); emit('sidebar-state', !!selected.value) })
+watch(selectedFilm, () => shiftForSidebar())
+
+// Theme watcher must be created at setup scope (not inside an awaited
+// onMounted) so it is cleaned up when the component unmounts.
+const { theme } = useTheme()
+watch(theme, () => { if (graphData.value) render() })
 
 onMounted(async () => {
   graphData.value = await loadGraph(props.slug, props.personName)
@@ -417,9 +445,6 @@ onMounted(async () => {
   resizeHandler = () => { if (graphData.value) render() }
   window.addEventListener('resize', resizeHandler)
   window.addEventListener('keydown', handleKey)
-
-  const { theme } = useTheme()
-  watch(theme, () => { if (graphData.value) render() })
 })
 
 watch(() => props.slug, async (next) => {
@@ -445,15 +470,16 @@ onBeforeUnmount(() => {
 
 .page-header {
   position: absolute;
-  top: 82px;
+  top: 108px;
   left: 48px;
   z-index: 4;
   max-width: 540px;
   pointer-events: none;
 }
+.page-header > * { pointer-events: auto; }
 
 .editorial-title {
-  font-size: 42px;
+  font-size: 28px;
 }
 .editorial-title .emph {
   font-style: italic;
@@ -528,7 +554,7 @@ onBeforeUnmount(() => {
   top: 0;
   right: 0;
   bottom: 0;
-  width: 420px;
+  width: 480px;
   max-width: 92vw;
   background: var(--bg-elevated);
   border-left: 1px solid var(--rule);
@@ -569,7 +595,8 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(2, 1fr);
   gap: 20px 16px;
 }
-.poster-cell { display: flex; flex-direction: column; gap: 8px; }
+.poster-cell { display: flex; flex-direction: column; gap: 8px; cursor: pointer; }
+.poster-cell:hover .poster-title { color: var(--accent); }
 .poster-frame {
   width: 100%;
   aspect-ratio: 2 / 3;

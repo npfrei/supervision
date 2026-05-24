@@ -11,7 +11,9 @@
     "db:fetch": "node scripts/fetch-data.mjs",
     "db:setup": "node scripts/setup-db.mjs",
     "db:archive": "node scripts/build-archive.mjs",
-    "db:extend": "node scripts/extend-db.mjs"
+    "db:extend": "node scripts/extend-db.mjs",
+    "db:coproductions": "node scripts/build-coproductions.mjs",
+    "palette:extract": "node scripts/extract-poster-colors.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.2",
@@ -22,5 +24,8 @@
     "nuxt": "^4.4.2",
     "vue": "^3.5.32",
     "vue-router": "^5.0.4"
+  },
+  "devDependencies": {
+    "jpeg-js": "^0.4.4"
   }
 }

@@ -8,6 +8,7 @@ import { createInterface } from 'node:readline'
 import { mkdir, readFile, rm, stat } from 'node:fs/promises'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildPeopleIndex } from './build-people-index.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const packageRoot = resolve(__dirname, '..')
@@ -301,6 +302,8 @@ async function main() {
     console.log(`  ${tag}: ${Date.now() - t}ms`)
   }
   console.log(`  Total: ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+
+  await buildPeopleIndex(db)
 
   db.close()
   console.log('Done.')

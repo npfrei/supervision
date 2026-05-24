@@ -27,6 +27,14 @@ function readVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
+// Forward declared so the theme watcher (which must be created at setup
+// scope, not after an await inside onMounted) can call it once the globe
+// is constructed.
+let applyMaterial = null
+watch(theme, () => {
+  if (globeInst && applyMaterial) applyMaterial()
+})
+
 const emit = defineEmits(['country-clicked', 'arc-clicked'])
 const globeEl = ref(null)
 const errorMsg = ref('')
@@ -64,7 +72,7 @@ onMounted(async () => {
       .polygonSideColor(() => 'rgba(0,0,0,0)') 
       .polygonStrokeColor(() => readVar('--globe-stroke'))
 
-    function applyMaterial() {
+    applyMaterial = function () {
       const material = globeInst.globeMaterial()
       if (material?.color) material.color.set(readVar('--globe-bg-mid'))
       globeInst.polygonStrokeColor(() => readVar('--globe-stroke'))
@@ -112,10 +120,6 @@ onMounted(async () => {
     }, 200);
     
     globeInst._resizeListener = resizeListener
-
-    watch(theme, () => {
-      if (globeInst) applyMaterial()
-    })
 
     const centroid = {}
     for (const f of countries.features) {
@@ -182,12 +186,50 @@ watch(() => props.selectedCountry, (newVal) => {
 })
 
 onUnmounted(() => {
-  if (globeInst && globeInst._resizeListener) {
+  if (!globeInst) return
+
+  if (globeInst._resizeListener) {
     window.removeEventListener('resize', globeInst._resizeListener)
   }
-  if (globeInst && globeInst.renderer()) {
-    globeInst.renderer().dispose()
-  }
+
+  // Stop the requestAnimationFrame loop globe.gl runs internally.
+  globeInst.pauseAnimation?.()
+
+  // Walk the scene and dispose every geometry/material/texture so GPU
+  // memory is reclaimed; renderer.dispose() alone does not do this.
+  try {
+    const scene = globeInst.scene?.()
+    scene?.traverse?.((obj) => {
+      obj.geometry?.dispose?.()
+      const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : [])
+      for (const m of mats) {
+        m.map?.dispose?.()
+        m.lightMap?.dispose?.()
+        m.bumpMap?.dispose?.()
+        m.normalMap?.dispose?.()
+        m.specularMap?.dispose?.()
+        m.envMap?.dispose?.()
+        m.dispose?.()
+      }
+    })
+  } catch {}
+
+  try { globeInst.controls?.()?.dispose?.() } catch {}
+  try { globeInst._destructor?.() } catch {}
+  try { globeInst.renderer().dispose() } catch {}
+
+  // Detach the canvas so the underlying WebGL context can be GC'd.
+  try {
+    const dom = globeInst.renderer?.()?.domElement
+    dom?.parentNode?.removeChild(dom)
+    globeInst.renderer?.()?.forceContextLoss?.()
+  } catch {}
+
+  globeInst = null
+  applyMaterial = null
+  arcs = []
+  hoveredArc = null
+  currentHoverD = null
 })
 </script>
 

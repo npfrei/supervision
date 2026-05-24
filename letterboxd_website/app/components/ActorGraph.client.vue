@@ -2,11 +2,10 @@
   <div class="actor-graph-wrapper">
     <header class="page-header">
       <h1 class="editorial-title">
-        {{ targetName }}<em class="emph">, and {{ totalFilmsWord }} films</em>
+        {{ targetName }}&rsquo;s <em class="emph">Constellation</em>
       </h1>
       <p class="lede">
-        {{ collaboratorCount }} names map this constellation — the actors and directors
-        who have shared a frame with them.
+        Explore their most frequent collaborators.
       </p>
     </header>
 
@@ -68,6 +67,8 @@ const props = defineProps({
   personName: { type: String, default: '' },
 })
 
+const emit = defineEmits(['sidebar-state'])
+
 const graphData = ref(null)
 
 async function loadGraph(slug, personName) {
@@ -93,6 +94,12 @@ const targetName = computed(() => graphData.value?.meta?.target ?? '')
 const totalFilms = computed(() => graphData.value?.meta?.totalFilms ?? 0)
 const collaboratorCount = computed(() =>
   graphData.value?.nodes?.filter(n => n.role !== 'center').length ?? 0
+)
+const actorCount = computed(() =>
+  graphData.value?.nodes?.filter(n => n.role === 'actor').length ?? 0
+)
+const directorCount = computed(() =>
+  graphData.value?.nodes?.filter(n => n.role === 'director').length ?? 0
 )
 
 const numberWord = (n) => {
@@ -424,8 +431,13 @@ function shiftForSidebar() {
   simulation.alpha(0.5).restart()
 }
 
-watch(selected, () => shiftForSidebar())
+watch(selected, () => { shiftForSidebar(); emit('sidebar-state', !!selected.value) })
 watch(selectedFilm, () => shiftForSidebar())
+
+// Theme watcher must be created at setup scope (not inside an awaited
+// onMounted) so it is cleaned up when the component unmounts.
+const { theme } = useTheme()
+watch(theme, () => { if (graphData.value) render() })
 
 onMounted(async () => {
   graphData.value = await loadGraph(props.slug, props.personName)
@@ -433,9 +445,6 @@ onMounted(async () => {
   resizeHandler = () => { if (graphData.value) render() }
   window.addEventListener('resize', resizeHandler)
   window.addEventListener('keydown', handleKey)
-
-  const { theme } = useTheme()
-  watch(theme, () => { if (graphData.value) render() })
 })
 
 watch(() => props.slug, async (next) => {
@@ -467,6 +476,7 @@ onBeforeUnmount(() => {
   max-width: 540px;
   pointer-events: none;
 }
+.page-header > * { pointer-events: auto; }
 
 .editorial-title {
   font-size: 28px;

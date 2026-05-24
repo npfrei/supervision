@@ -10,12 +10,6 @@
         <NuxtLink to="/constellations" active-class="on">Constellations</NuxtLink>
         <NuxtLink to="/stories" active-class="on">Stories</NuxtLink>
       </nav>
-      <template v-if="route.path === '/atlas'">
-        <div class="divider" aria-hidden="true"></div>
-        <button class="arcs-toggle" :class="{ on: showArcs }" @click="showArcs = !showArcs">
-          Co-productions
-        </button>
-      </template>
       <div class="divider" aria-hidden="true"></div>
       <ThemeToggle />
     </div>
@@ -23,8 +17,6 @@
 </template>
 
 <script setup>
-const route = useRoute()
-const showArcs = useArcs()
 </script>
 
 <style scoped>
@@ -76,18 +68,6 @@ const showArcs = useArcs()
   color: var(--ink);
   border-bottom-color: var(--accent);
 }
-
-.arcs-toggle {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: 14px;
-  color: var(--ink-faint);
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  transition: color 200ms ease;
-}
-.arcs-toggle:hover { color: var(--ink); }
-.arcs-toggle.on { color: var(--ink); }
 
 .divider {
   width: 1px;

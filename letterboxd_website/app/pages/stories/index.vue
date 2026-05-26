@@ -2,7 +2,7 @@
   <div class="stories-page">
     <div class="frame">
       <div class="eyebrow">Stories</div>
-      <h1 class="editorial-title">Four small chapters about collaboration.</h1>
+      <h1 class="editorial-title">Six small chapters about collaboration.</h1>
       <p class="lede">A short editorial series in development. Each chapter picks a curated collective of filmmakers — a director's troupe, a producer's stable — and walks through the films that built it.</p>
       <ul class="stub-grid">
         <li
@@ -33,10 +33,14 @@
 const NuxtLink = resolveComponent('NuxtLink')
 
 const chapters = [
-  { n: 1, title: 'Forthcoming', href: null },
-  { n: 2, title: 'Forthcoming', href: null },
+  
+  { n: 1, title: 'The Gentle Monster: The Boris Karloff Eras', href: '/stories/karloff' },
+  { n: 2, title: 'Into the Wild: The Themes of Werner Herzog\'s Films ', href: '/stories/herzog' },
   { n: 3, title: 'The Architecture of Time: The Christopher Nolan Eras', href: '/stories/nolan' },
   { n: 4, title: "America’s Chronicler: Scorsese’s Visual Journey", href: '/stories/scorsese' },
+  { n: 5, title: 'The Gaze Within: The Chantal Akerman Eras', href: '/stories/akerman' },
+  { n: 6, title: 'Queer Perspectives and Activism: Derek Jarman' , href: '/stories/jarman' }
+ 
 ]
 </script>
 

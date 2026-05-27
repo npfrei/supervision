@@ -16,7 +16,7 @@
     <div class="content">
       <div class="eyebrow-row reveal r1">
         <div class="rule"></div>
-        <div class="eyebrow">Era {{ era.roman }} · {{ era.yearRange[0] }} to {{ displayHi }}</div>
+        <div class="eyebrow">Theme {{ era.roman }}</div>
       </div>
 
       <h2 class="title reveal r2">

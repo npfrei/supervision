@@ -35,7 +35,7 @@ const NuxtLink = resolveComponent('NuxtLink')
 const chapters = [
   
   { n: 1, title: 'The Gentle Monster: The Boris Karloff Eras', href: '/stories/karloff' },
-  { n: 2, title: 'Into the Wild: The Themes of Werner Herzog\'s Films ', href: '/stories/herzog' },
+  { n: 2, title: 'Between Fact and Fiction: The Themes of Werner Herzog\'s Films ', href: '/stories/herzog' },
   { n: 3, title: 'The Architecture of Time: The Christopher Nolan Eras', href: '/stories/nolan' },
   { n: 4, title: "America’s Chronicler: Scorsese’s Visual Journey", href: '/stories/scorsese' },
   { n: 5, title: 'The Gaze Within: The Chantal Akerman Eras', href: '/stories/akerman' },

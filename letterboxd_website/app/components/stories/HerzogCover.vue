@@ -13,7 +13,7 @@
 
       <h1 class="title">
         Werner Herzog<br>
-        <em>Into the Wild</em>
+        <em>Between Fact and Fiction</em>
       </h1>
 
       <p class="lede">

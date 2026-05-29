@@ -7,19 +7,28 @@ let initialized = false
 
 function readInitialTheme(): Theme {
   if (typeof document === 'undefined') return 'light'
+  const fromStorage = localStorage.getItem('theme')
+  if (fromStorage === 'light' || fromStorage === 'dark') return fromStorage
   const fromAttr = document.documentElement.dataset.theme
   if (fromAttr === 'light' || fromAttr === 'dark') return fromAttr
   return 'light'
 }
 
 export function useTheme() {
-  if (!initialized && typeof document !== 'undefined') {
-    theme.value = readInitialTheme()
-    watch(theme, (next) => {
-      document.documentElement.dataset.theme = next
-      try { localStorage.setItem('theme', next) } catch {}
-    })
+  if (!initialized) {
     initialized = true
+    if (typeof document !== 'undefined') {
+      // Defer to after hydration so server & client start with same value ('light')
+      // then immediately correct to the real theme
+      const saved = readInitialTheme()
+      if (saved !== theme.value) {
+        theme.value = saved
+      }
+      watch(theme, (next) => {
+        document.documentElement.dataset.theme = next
+        try { localStorage.setItem('theme', next) } catch {}
+      }, { immediate: true })
+    }
   }
 
   function toggle() {

@@ -12,7 +12,9 @@
         <NuxtLink to="/stories" active-class="on">Stories</NuxtLink>
       </nav>
       <div class="divider" aria-hidden="true"></div>
-      <ThemeToggle />
+      <ClientOnly>
+        <ThemeToggle />
+      </ClientOnly>
     </div>
   </header>
 </template>

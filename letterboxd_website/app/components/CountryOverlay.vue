@@ -781,12 +781,12 @@ const onFilterKey = (e) => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 24px 24px;
+  padding: 96px 24px 24px;
 }
 
 .overlay-modal {
   width: min(1200px, 96vw);
-  max-height: calc(100vh - 80px);
+  max-height: calc(100vh - 120px);
   background: var(--bg-elevated);
   border: 1px solid var(--rule);
   border-radius: 14px;

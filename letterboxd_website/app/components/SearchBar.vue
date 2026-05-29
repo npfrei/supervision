@@ -1,7 +1,11 @@
 <template>
   <div class="search-wrapper">
     <div class="search-bar">
-      <span class="search-icon">🔍</span>
+      <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 16 16 ">
+        <path d="M0 0h16v16H0z" fill="none" />
+        <path fill="currentColor" fill-rule="evenodd" d="M11.5 7a4.5 4.5 0 1 1-9 0a4.5 4.5 0 0 1 9 0m-.82 4.74a6 6 0 1 1 1.06-1.06l2.79 2.79a.75.75 0 1 1-1.06 1.06z" clip-rule="evenodd" />
+      </svg>
+
       <input
         v-model="query"
         @input="onInput"
@@ -160,7 +164,8 @@ const clearSearch = () => {
 .search-icon {
   position: absolute;
   left: 14px;
-  font-size: 14px;
+  width: 16px;
+  height: 16px;
   color: var(--ink-faint);
   pointer-events: none;
 }

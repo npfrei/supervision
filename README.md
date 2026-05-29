@@ -8,7 +8,7 @@
 | Arthur Taieb | 361195 |
 
 
-[Milestone 1](#milestone-1) • [Milestone 2](#milestone-2) • [Milestone 3](#milestone-3)
+[Milestone 1](#milestone-1-20th-march-5pm) • [Milestone 2](#milestone-2-17th-april-5pm) • [Milestone 3](#milestone-3-29th-may-5pm)
 
 ## Milestone 1 (20th March, 5pm)
 
@@ -204,6 +204,11 @@ For design inspiration, we look to [The Pudding](https://pudding.cool) for its s
 
 **80% of the final grade**
 
+[Website](https://github.com/com-480-data-visualization/supervision/tree/master/letterboxd_website)
+
+[Screencast](https://github.com/com-480-data-visualization/supervision/tree/master/screencast.mp4)
+
+[Process book](https://github.com/com-480-data-visualization/supervision/blob/master/ProcessBook-Supervision.pdf)
 
 
 

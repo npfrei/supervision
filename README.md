@@ -208,7 +208,7 @@ For design inspiration, we look to [The Pudding](https://pudding.cool) for its s
 
 [Screencast](https://github.com/com-480-data-visualization/supervision/tree/master/screencast.mp4)
 
-[Process book](https://github.com/com-480-data-visualization/supervision/blob/master/process_book.pdf)
+[Process book](https://github.com/com-480-data-visualization/supervision/blob/master/ProcessBook-Supervision.pdf)
 
 
 
